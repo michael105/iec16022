@@ -34,7 +34,7 @@
 #include "config.h"
 
  // simple checked response malloc
-static void *safemalloc(int n)
+static void *msafemalloc(int n)
 {
 	void *p = malloc(n);
 	if (!p) {
@@ -117,7 +117,7 @@ int main(int argc, const char *argv[])
 		{
 		 "format", 'f', POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARG_STRING,
 		 &format, 0,
-		 "Output format", "Text/Ansi/CP437/UTF-8/EPS/PNG/Bin/Hex/Stamp"},
+		 "Output format", "Text/Ansi/CP437/rCP437/UTF-8/EPS/PNG/Bin/Hex/Stamp"},
 		{"gs1", 0, POPT_ARG_NONE, &gs1, 0, "Enable GS1 mode, start with FNC1", 0},
 		POPT_AUTOHELP {
 			       NULL, 0, 0, NULL, 0, NULL, NULL}
@@ -145,9 +145,13 @@ int main(int argc, const char *argv[])
 		return 1;
 	}
 
-	if (infile) {		// read from file
-		FILE *f = fopen(infile, "rb");
-		barcode = safemalloc(4001);
+	if (infile) {		// read from file / stdin
+		FILE *f; 
+		if ( strcmp(infile,"-") == 0 )
+			f = stdin;
+		else 
+			f = fopen(infile, "rb");
+		barcode = msafemalloc(4001);
 		if (!f) {
 			perror(infile);
 			return 1;
@@ -237,7 +241,7 @@ int main(int argc, const char *argv[])
 				// Generate simplistic encoding rules as used by the windows app
 				// TBA - does not always match the windows app...
 				n = 0;
-				encoding = safemalloc(barcodelen + 1);
+				encoding = msafemalloc(barcodelen + 1);
 				while (n < barcodelen) {
 					// ASCII
 					while (1) {
@@ -328,7 +332,7 @@ int main(int argc, const char *argv[])
 		break;
 	case 'a':		// text, ansi
 		{
-			printf("\n");
+			printf("\e[0m\n");
 			int y;
 			for (y = H - 1; y >= 0; y--) {
 				printf("   "); // left border
@@ -356,6 +360,40 @@ int main(int argc, const char *argv[])
 			printf("\n"); // bottom border
 		}
 		break;
+	case 'r':		// text, cp437, reverse
+		{
+			printf("\e[7m");
+			for ( int x=0; x<W+4; x++ )
+				printf(" ");
+			printf("\e[0m\n");
+			int y;
+			for (y = H - 1; y >= 1; y-=2) {
+				printf("\e[7m  "); // left border
+				int x;
+				for (x = 0; x < W; x++){
+					if ( grid[W * y + x] ){
+						if ( grid[W * (y-1) + x] )
+							printf("\xdb");
+						else 
+							printf("\xdf");
+					} else {
+						if ( grid[W * (y-1) + x] )
+							printf("\xdc");
+						else 
+							printf(" ");
+					}
+				}
+				printf("  \e[0m\n"); // right border
+			}
+			printf("\e[7m");
+			for ( int x=0; x<W+4; x++ )
+				printf(" ");
+			printf("\e[0m\n");
+
+		}
+		break;
+
+
 	case 'c':		// text, cp437
 		{
 			printf("\n");
@@ -376,7 +414,7 @@ int main(int argc, const char *argv[])
 							printf(" ");
 					}
 				}
-				printf("\n");
+				printf("   \n");
 			}
 			printf("\n"); // bottom border
 		}
